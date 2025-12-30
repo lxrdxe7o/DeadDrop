@@ -1,0 +1,49 @@
+version: '3.9'
+
+# Production deployment with Caddy reverse proxy
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./src/web/dist:/var/www/deaddrop
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./src/py
+      dockerfile: Dockerfile
+    expose:
+      - "8000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - STORAGE_PATH=/app/storage
+      - CORS_ORIGINS=https://deaddrop.yourdomain.com
+      - DEBUG=false
+    volumes:
+      - ./storage:/app/storage
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    expose:
+      - "6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  caddy-data:
+  caddy-config:
