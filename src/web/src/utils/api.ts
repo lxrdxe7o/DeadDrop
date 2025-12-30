@@ -30,7 +30,7 @@ export async function uploadFile(
   maxDownloads: number
 ): Promise<UploadResponse> {
   const formData = new FormData();
-  formData.append('file', new Blob([encryptedData]), `${filename}.enc`);
+  formData.append('file', new Blob([new Uint8Array(encryptedData)]), `${filename}.enc`);
   formData.append('filename', filename);
   formData.append('ttl', ttl.toString());
   formData.append('max_downloads', maxDownloads.toString());

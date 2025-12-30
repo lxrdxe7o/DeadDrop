@@ -6,7 +6,8 @@ Provides type-safe configuration with validation.
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List
+from pydantic import field_validator
+from typing import List, Union
 
 
 class Settings(BaseSettings):
@@ -25,7 +26,14 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379"
     
     # CORS configuration (comma-separated origins in env var)
-    cors_origins: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    cors_origins: Union[str, List[str]] = "http://localhost:3000,http://localhost:5173"
+    
+    @field_validator('cors_origins', mode='before')
+    @classmethod
+    def parse_cors_origins(cls, v):
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(',')]
+        return v
     
     # TTL options (in seconds)
     ttl_1_hour: int = 3600

@@ -29,7 +29,7 @@ export function Download() {
         const key = base64UrlToKey(keyFragment);
         const decryptedData = decryptFile(encryptedData, key);
         
-        const blob = new Blob([decryptedData]);
+        const blob = new Blob([new Uint8Array(decryptedData)]);
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
