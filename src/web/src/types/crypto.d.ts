@@ -21,3 +21,10 @@ export interface CryptoModule {
 }
 
 export type CreateCryptoModule = () => Promise<CryptoModule>;
+
+// Global declaration for crypto module loaded from script tag
+declare global {
+  interface Window {
+    createCryptoModule: CreateCryptoModule;
+  }
+}
