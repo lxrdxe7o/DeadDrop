@@ -39,6 +39,7 @@
 ### Data Flow
 
 **Upload:**
+
 1. User selects file in browser
 2. Generate random 256-bit key via `crypto.getRandomValues()`
 3. Encrypt file using ChaCha20-Poly1305 (WASM)
@@ -47,6 +48,7 @@
 6. Return shareable link: `https://domain/download?id={UUID}#{KEY}`
 
 **Download:**
+
 1. Parse UUID (query param) and key (URL fragment)
 2. Download encrypted blob from server (key never transmitted)
 3. Decrypt in browser using WASM
@@ -66,12 +68,14 @@
 ### Setup
 
 1. **Clone repository:**
+
 ```bash
 git clone https://github.com/yourusername/deaddrop.git
 cd deaddrop
 ```
 
 2. **Build WASM cryptography module:**
+
 ```bash
 # Install Emscripten (first time only)
 git clone https://github.com/emscripten-core/emsdk.git
@@ -88,6 +92,7 @@ cd ../..
 ```
 
 3. **Build frontend:**
+
 ```bash
 cd src/web
 npm install
@@ -96,6 +101,7 @@ cd ../..
 ```
 
 4. **Start services:**
+
 ```bash
 docker-compose up -d
 ```
@@ -147,6 +153,7 @@ npm run build  # tsc runs automatically
 ## Production Deployment
 
 1. **Build frontend:**
+
 ```bash
 cd src/web
 npm run build
@@ -157,6 +164,7 @@ npm run build
    - Update CORS origins in `docker-compose.prod.yml`
 
 3. **Deploy:**
+
 ```bash
 docker-compose -f docker-compose.prod.yml up -d
 ```
@@ -188,7 +196,7 @@ The encryption key is stored in the URL fragment (after `#`). According to RFC 3
 
 ---
 
-## Interview Talking Points
+## QA
 
 ### 1. "Why ChaCha20-Poly1305 over AES-256-GCM?"
 
@@ -280,12 +288,14 @@ DeadDrop/
 Upload encrypted file blob.
 
 **Request:**
+
 - `file` (binary): Encrypted file data
 - `ttl` (int): Time to live (3600, 86400, or 259200 seconds)
 - `max_downloads` (int): Maximum downloads (1-5)
 - `filename` (string): Original filename
 
 **Response:**
+
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
@@ -298,6 +308,7 @@ Upload encrypted file blob.
 Download encrypted file blob.
 
 **Response:**
+
 - `200`: Encrypted file stream (`application/octet-stream`)
 - `404`: File unavailable (expired/deleted/invalid)
 
@@ -318,6 +329,7 @@ This is a portfolio project demonstrating senior-level system design with junior
 ## Author
 
 Built as a portfolio project to demonstrate:
+
 - ✅ Zero-knowledge cryptography (client-side encryption)
 - ✅ Full-stack development (React + FastAPI)
 - ✅ WebAssembly integration (C++ → WASM)
