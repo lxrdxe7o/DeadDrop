@@ -1,7 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { encryptFile, generateKey, keyToBase64Url } from '../utils/crypto';
-import { uploadFile } from '../utils/api';
+import { uploadFile, getErrorMessage } from '../utils/api';
 import { MAX_FILE_SIZE, TTL_OPTIONS } from '../utils/constants';
 
 export function Upload() {
@@ -11,32 +11,38 @@ export function Upload() {
   const [maxDownloads, setMaxDownloads] = useState(1);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!file) return;
-    
+
     setError(null);
     setIsUploading(true);
-    
+
     try {
+      // Validate file size
       if (file.size > MAX_FILE_SIZE) {
         throw new Error('File too large (max 50MB)');
       }
-      
+
+      // Read and encrypt file
       const fileData = new Uint8Array(await file.arrayBuffer());
       const key = generateKey();
       const encryptedData = encryptFile(fileData, key);
-      
+
+      // Upload encrypted file (with automatic retry)
       const response = await uploadFile(encryptedData, file.name, ttl, maxDownloads);
-      
+
+      // Generate share URL with encryption key in fragment
       const keyFragment = keyToBase64Url(key);
       const shareUrl = `${window.location.origin}/download?id=${response.id}#${keyFragment}`;
-      
+
       navigate('/share', { state: { shareUrl, expiresAt: response.expires_at } });
-      
+
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
+      // Use improved error message extraction
+      setError(getErrorMessage(err));
+      console.error('Upload error:', err);
     } finally {
       setIsUploading(false);
     }
