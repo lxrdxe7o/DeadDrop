@@ -3,12 +3,21 @@ Storage abstraction layer for encrypted file blobs.
 
 Uses Protocol for type-safe interface, enabling easy migration from
 local filesystem to S3 or other cloud storage providers.
+Includes comprehensive error handling and timeout support.
 """
 
+import asyncio
 from typing import Protocol
 from pathlib import Path
 import aiofiles
+import aiofiles.os
 import os
+from core.exceptions import (
+    StorageWriteError,
+    StorageReadError,
+    StorageDeleteError,
+    FileNotFoundError as DeadDropFileNotFoundError
+)
 
 
 class StorageBackend(Protocol):
@@ -38,20 +47,33 @@ class StorageBackend(Protocol):
 class LocalStorage:
     """
     Local filesystem storage implementation.
-    
+
+    Features:
+    - Non-blocking async I/O operations
+    - Timeout handling for all operations
+    - Comprehensive error handling
+    - Directory traversal prevention
+    - Idempotent delete operations
+
     Stores encrypted blobs as {uuid}.enc files in the configured directory.
     Suitable for single-server deployments or development.
     """
-    
-    def __init__(self, base_path: str = "./storage"):
+
+    def __init__(
+        self,
+        base_path: str = "./storage",
+        operation_timeout: float = 30.0
+    ):
         """
         Initialize local storage.
-        
+
         Args:
             base_path: Directory path for storing encrypted files
+            operation_timeout: Timeout for file operations (seconds)
         """
         self.base_path = Path(base_path)
         self.base_path.mkdir(parents=True, exist_ok=True)
+        self.operation_timeout = operation_timeout
     
     def _get_path(self, file_id: str) -> Path:
         """
@@ -72,49 +94,134 @@ class LocalStorage:
     async def save(self, file_id: str, data: bytes) -> None:
         """
         Save encrypted blob to disk.
-        
+
         Args:
             file_id: File identifier
             data: Encrypted file data
-        
+
         Raises:
-            IOError: If write fails
+            StorageWriteError: If write fails or times out
         """
         path = self._get_path(file_id)
-        async with aiofiles.open(path, 'wb') as f:
-            await f.write(data)
+        try:
+            async with asyncio.timeout(self.operation_timeout):
+                # Write to temp file first, then atomic rename
+                temp_path = path.with_suffix('.tmp')
+                try:
+                    async with aiofiles.open(temp_path, 'wb') as f:
+                        await f.write(data)
+                    # Atomic rename to prevent partial writes
+                    await aiofiles.os.rename(temp_path, path)
+                except Exception as e:
+                    # Clean up temp file if it exists
+                    if temp_path.exists():
+                        try:
+                            os.remove(temp_path)
+                        except Exception:
+                            pass
+                    raise e
+
+        except asyncio.TimeoutError as e:
+            raise StorageWriteError(
+                message="Storage write operation timed out",
+                details={"file_id": file_id, "size": len(data)}
+            ) from e
+        except OSError as e:
+            raise StorageWriteError(
+                message="Failed to write file to storage",
+                details={"file_id": file_id, "error": str(e)},
+                internal_message=str(e)
+            ) from e
+        except Exception as e:
+            raise StorageWriteError(
+                message="Unexpected error writing to storage",
+                details={"file_id": file_id, "error": str(e)},
+                internal_message=str(e)
+            ) from e
     
     async def load(self, file_id: str) -> bytes:
         """
         Load encrypted blob from disk.
-        
+
         Args:
             file_id: File identifier
-        
+
         Returns:
             Encrypted file data
-        
+
         Raises:
             FileNotFoundError: If file doesn't exist
-            IOError: If read fails
+            StorageReadError: If read fails or times out
         """
         path = self._get_path(file_id)
-        async with aiofiles.open(path, 'rb') as f:
-            return await f.read()
+        try:
+            async with asyncio.timeout(self.operation_timeout):
+                if not path.exists():
+                    raise DeadDropFileNotFoundError(
+                        file_id=file_id,
+                        details={"path": str(path)}
+                    )
+                async with aiofiles.open(path, 'rb') as f:
+                    return await f.read()
+
+        except asyncio.TimeoutError as e:
+            raise StorageReadError(
+                message="Storage read operation timed out",
+                details={"file_id": file_id}
+            ) from e
+        except DeadDropFileNotFoundError:
+            raise  # Re-raise our custom exception
+        except OSError as e:
+            raise StorageReadError(
+                message="Failed to read file from storage",
+                details={"file_id": file_id, "error": str(e)},
+                internal_message=str(e)
+            ) from e
+        except Exception as e:
+            raise StorageReadError(
+                message="Unexpected error reading from storage",
+                details={"file_id": file_id, "error": str(e)},
+                internal_message=str(e)
+            ) from e
     
     async def delete(self, file_id: str) -> None:
         """
         Delete encrypted blob from disk.
-        
+
         Args:
             file_id: File identifier
-        
+
+        Raises:
+            StorageDeleteError: If delete fails (but not if file doesn't exist)
+
         Note:
-            Does not raise error if file doesn't exist (idempotent).
+            Idempotent - does not raise error if file doesn't exist.
         """
         path = self._get_path(file_id)
-        if path.exists():
-            os.remove(path)
+        try:
+            async with asyncio.timeout(self.operation_timeout):
+                if path.exists():
+                    await aiofiles.os.remove(path)
+
+        except asyncio.TimeoutError as e:
+            raise StorageDeleteError(
+                message="Storage delete operation timed out",
+                details={"file_id": file_id}
+            ) from e
+        except OSError as e:
+            # Only raise if file exists but can't be deleted
+            if path.exists():
+                raise StorageDeleteError(
+                    message="Failed to delete file from storage",
+                    details={"file_id": file_id, "error": str(e)},
+                    internal_message=str(e)
+                ) from e
+        except Exception as e:
+            raise StorageDeleteError(
+                message="Unexpected error deleting from storage",
+                details={"file_id": file_id, "error": str(e)},
+                internal_message=str(e)
+            ) from e
     
     async def exists(self, file_id: str) -> bool:
         """
