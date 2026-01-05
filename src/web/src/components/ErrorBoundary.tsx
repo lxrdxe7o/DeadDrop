@@ -1,11 +1,12 @@
 /**
  * Error Boundary Component
  *
- * Catches React errors and displays a fallback UI.
+ * Catches React errors and displays a styled fallback UI.
  * Prevents the entire app from crashing when a component throws an error.
  */
 
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, ErrorInfo, ReactNode } from 'react';
+import { EncryptionMesh } from './EncryptionMesh';
 
 interface Props {
   children: ReactNode;
@@ -29,7 +30,6 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   static getDerivedStateFromError(error: Error): Partial<State> {
-    // Update state so the next render will show the fallback UI
     return {
       hasError: true,
       error,
@@ -37,17 +37,11 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    // Log error details for debugging
     console.error('Error Boundary caught an error:', error, errorInfo);
-
-    // Update state with error info
     this.setState({
       error,
       errorInfo,
     });
-
-    // TODO: Send error to logging service
-    // Example: logErrorToService(error, errorInfo);
   }
 
   handleReset = (): void => {
@@ -60,80 +54,97 @@ class ErrorBoundary extends Component<Props, State> {
 
   render(): ReactNode {
     if (this.state.hasError) {
-      // Custom fallback UI
       if (this.props.fallback) {
         return this.props.fallback;
       }
 
-      // Default fallback UI
       return (
-        <div
-          style={{
-            padding: '2rem',
-            maxWidth: '600px',
-            margin: '2rem auto',
-            backgroundColor: '#fee',
-            border: '1px solid #fcc',
-            borderRadius: '8px',
-          }}
-        >
-          <h1 style={{ color: '#c00' }}>Something went wrong</h1>
-          <p>
-            We're sorry, but something unexpected happened. Please try refreshing
-            the page.
-          </p>
+        <>
+          <EncryptionMesh />
+          <div className="page-container">
+            <div className="glass-card">
+              {/* Error Icon */}
+              <div className="text-center mb-6">
+                <svg 
+                  width="64" 
+                  height="64" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="var(--error)" 
+                  strokeWidth="1.5"
+                  style={{ 
+                    margin: '0 auto',
+                    filter: 'drop-shadow(0 0 20px rgba(239, 68, 68, 0.5))'
+                  }}
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+              </div>
 
-          {process.env.NODE_ENV === 'development' && this.state.error && (
-            <details style={{ marginTop: '1rem' }}>
-              <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>
-                Error Details (Development Only)
-              </summary>
-              <pre
-                style={{
-                  marginTop: '0.5rem',
-                  padding: '1rem',
-                  backgroundColor: '#f5f5f5',
-                  borderRadius: '4px',
-                  overflow: 'auto',
-                  fontSize: '0.875rem',
-                }}
-              >
-                {this.state.error.toString()}
-                {this.state.errorInfo && this.state.errorInfo.componentStack}
-              </pre>
-            </details>
-          )}
+              {/* Error Title */}
+              <h2 className="text-center" style={{ color: 'var(--error)' }}>
+                Something Went Wrong
+              </h2>
+              <p className="text-center text-secondary mt-2">
+                We're sorry, but something unexpected happened.
+              </p>
 
-          <div style={{ marginTop: '1rem' }}>
-            <button
-              onClick={this.handleReset}
-              style={{
-                padding: '0.5rem 1rem',
-                marginRight: '0.5rem',
-                backgroundColor: '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}
-            >
-              Try Again
-            </button>
-            <button
-              onClick={() => window.location.reload()}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}
-            >
-              Refresh Page
-            </button>
+              {/* Error Details (Development Only) */}
+              {import.meta.env.DEV && this.state.error && (
+                <details className="mt-6">
+                  <summary 
+                    className="text-sm text-muted"
+                    style={{ cursor: 'pointer', marginBottom: 'var(--space-2)' }}
+                  >
+                    Error Details (Development Only)
+                  </summary>
+                  <pre
+                    style={{
+                      padding: 'var(--space-4)',
+                      background: 'var(--surface-dark)',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: 'var(--text-xs)',
+                      overflow: 'auto',
+                      color: 'var(--error)',
+                      border: '1px solid var(--glass-border)',
+                    }}
+                  >
+                    {this.state.error.toString()}
+                    {this.state.errorInfo && this.state.errorInfo.componentStack}
+                  </pre>
+                </details>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-4 mt-6">
+                <button
+                  onClick={this.handleReset}
+                  className="btn btn-secondary"
+                  style={{ flex: 1 }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="1 4 1 10 7 10" />
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                  </svg>
+                  <span>Try Again</span>
+                </button>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="btn btn-primary"
+                  style={{ flex: 1 }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="23 4 23 10 17 10" />
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                  </svg>
+                  <span>Refresh Page</span>
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        </>
       );
     }
 
